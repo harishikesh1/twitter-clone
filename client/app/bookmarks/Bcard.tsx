@@ -5,17 +5,17 @@ import { FaBookmark, FaHeart, FaRetweet } from "react-icons/fa";
 import { FiUpload } from "react-icons/fi";
 import { Tweet } from "@/gql/graphql";
 import Link from "next/link";
-import { useLikeTweet, useBookmarkTweet, useCheckIfBookmarked, useAddComment, useDeleteComment } from "../hooks/tweet";
+import { useLikeTweet, useBookmarkTweet, useCheckIfBookmarked, useAddComment, useDeleteComment } from "../../hooks/tweet";
 
 interface FeedCardProps {
-    data: any;
+    data: Tweet;
     currentUserId: string;
 }
 
 const Card: React.FC<FeedCardProps> = (props) => {
     const { data, currentUserId } = props;
     const [isLiked, setIsLiked] = useState<boolean>(
-        data.likes?.some((like : any) => like?.id === currentUserId) || false
+        data.likes?.some(like => like?.id === currentUserId) || false
     );
     const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
     const [commentContent, setCommentContent] = useState<string>("");
@@ -118,25 +118,14 @@ const Card: React.FC<FeedCardProps> = (props) => {
                         </div>
                     </div>
                 </div>
-                <form onSubmit={handleAddComment}>
-                        <input
-                            ref={inputRef}
-                            id="comment"
-                            type="text"
-                            className="w-full p-2 rounded-md bg-hover-color border border-gray-600 focus:outline-none"
-                            placeholder="Add a comment..."
-                            value={commentContent}
-                            onChange={(e) => setCommentContent(e.target.value)}
-                        />
-                    </form>
 
                 <div className="mt-3">
-                    {data.comments?.map((comment  : any) => {
-                        if (!comment || !comment.id) return null;  
+                    {data.comments?.map((comment) => {
+                        if (!comment || !comment.id) return null; // Skip rendering if comment or id is missing
 
                         return (
                             <div
-                                key={comment.id}   
+                                key={comment.id}  // Ensure this is unique and defined
                                 className="flex justify-between items-center border-b border-border-color py-2"
                             >
                                 <div>
