@@ -1,31 +1,28 @@
+import React, { useCallback, useMemo, useState, useEffect } from "react";
+import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/router";
 import Image from "next/image";
-import React, { useCallback, useMemo, useState } from "react";
-import { CredentialResponse, GoogleLogin } from "@react-oauth/google";
-import Card from "../Card";
-import toast, { Toaster } from "react-hot-toast";
-import { BiHomeAlt, BiImageAlt, BiSmile } from "react-icons/bi";
-import { FaXTwitter } from "react-icons/fa6";
+import Link from "next/link";
+import toast from "react-hot-toast";
+import { FaXTwitter, FaRegBookmark } from "react-icons/fa6";
+import { BiHomeAlt } from "react-icons/bi";
 import { IoSearch } from "react-icons/io5";
 import { RiNotification4Line } from "react-icons/ri";
 import { MdMailOutline } from "react-icons/md";
-import { FaRegBookmark } from "react-icons/fa6";
 import { HiOutlineUser } from "react-icons/hi";
 import { graphQLClient } from "@/client/api";
 import { VerifyGoogleToken } from "@/graphql/query/user";
 import { userCurrentUser } from "@/hooks/user";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { useGetAllTweets, useCreateTweet } from "@/hooks/tweet";
-import { Tweet } from "@/gql/graphql";
-import Link from "next/link";
+
+interface VerifyGoogleTokenResponse {
+  verifyGoogleToken: string;
+}
 
 interface TwitterIcon {
   title: string;
   icon: React.ReactNode;
   link: string;
-}
-
-interface VerifyGoogleTokenResponse {
-  verifyGoogleToken: string;
 }
 
 interface TwitterlayoutProps {
@@ -34,50 +31,31 @@ interface TwitterlayoutProps {
 
 const Twitterlayout: React.FC<TwitterlayoutProps> = (props) => {
   const { user, isLoading, error } = userCurrentUser();
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!isLoading) {
+      setAuthCheckComplete(true);
+    }
+  }, [isLoading]);
+
   const sideBarIcons: TwitterIcon[] = useMemo(
     () => [
-      {
-        title: "Home",
-        icon: <BiHomeAlt />,
-        link: "/",
-      },
-      {
-        title: "Explore",
-        icon: <IoSearch />,
-        link: "/",
-      },
-      {
-        title: "Notification",
-        icon: <RiNotification4Line />,
-        link: "/",
-      },
-      {
-        title: "Message",
-        icon: <MdMailOutline />,
-        link: "/",
-      },
-      {
-        title: "Bookmarks",
-        icon: <FaRegBookmark />,
-        link: "/bookmarks",
-      },
-      {
-        title: "Profile",
-        icon: <HiOutlineUser />,
-        link: `/${user?.id}`,
-      },
+      { title: "Home", icon: <BiHomeAlt />, link: "/" },
+      { title: "Explore", icon: <IoSearch />, link: "/" },
+      { title: "Notification", icon: <RiNotification4Line />, link: "/" },
+      { title: "Message", icon: <MdMailOutline />, link: "/" },
+      { title: "Bookmarks", icon: <FaRegBookmark />, link: "/bookmarks" },
+      { title: "Profile", icon: <HiOutlineUser />, link: `/${user?.id}` },
     ],
     [user?.id]
   );
 
-  const queryClient = useQueryClient();
-
   const handleLoginWithGoogle = useCallback(
     async (cred: CredentialResponse) => {
       const googleToken = cred.credential;
-      if (!googleToken) {
-        return toast.error("Google error");
-      }
+      if (!googleToken) return toast.error("Google error");
 
       try {
         const verifyUser = await graphQLClient.request<VerifyGoogleTokenResponse>(
@@ -89,21 +67,22 @@ const Twitterlayout: React.FC<TwitterlayoutProps> = (props) => {
         if (verifyGoogleToken) {
           toast.success("Verified Google account");
           localStorage.setItem("__twitter_token", verifyGoogleToken);
-          const token = localStorage.getItem("__twitter_token");
-          graphQLClient.setHeader("authorization", `Bearer ${token}`);
-
+          graphQLClient.setHeader("authorization", `Bearer ${verifyGoogleToken}`);
           queryClient.invalidateQueries(["current-user"] as any);
           queryClient.refetchQueries(["current-user"] as any);
         }
-      } catch (error) {
+      } catch {
         toast.error("Verification failed");
       }
     },
     [queryClient]
   );
 
+  if (!authCheckComplete) return null;
+
   return (
     <div className="grid grid-cols-12 h-screen">
+      {/* Sidebar */}
       <div className="col-span-2 sm:col-span-3 sm:px-4 flex sm:justify-end relative">
         <div>
           <div className="text-3xl hover:bg-hover-color transition-colors rounded-full sm:p-3 w-fit h-fit">
@@ -153,14 +132,17 @@ const Twitterlayout: React.FC<TwitterlayoutProps> = (props) => {
         )}
       </div>
 
+      {/* Main Content */}
       <div
         className="col-span-10 sm:col-span-5 border-r border-l border-border-color overflow-scroll"
         style={{ scrollbarWidth: "none" }}
       >
         {props.children}
       </div>
+
+      {/* Right Sidebar */}
       <div className="col-span-0 sm:col-span-3 p-5">
-        {error || isLoading ? (
+        {error || isLoading || !authCheckComplete ? (
           <div className="p-5 rounded-lg">
             <h2 className="my-2 text-2xl">New to Twitter</h2>
             <GoogleLogin onSuccess={handleLoginWithGoogle} />
@@ -173,7 +155,7 @@ const Twitterlayout: React.FC<TwitterlayoutProps> = (props) => {
         ) : (
           <div className="px-4 py-3 bg-gray-950 rounded-lg">
             <h1 className="my-2 text-2xl mb-5">Users you may know</h1>
-            {user?.recommendedUsers?.map((el) => (
+            {user.recommendedUsers?.map((el) => (
               <div className="flex items-center gap-3 mt-2" key={el?.id}>
                 {el?.profileImageURL && (
                   <Image
